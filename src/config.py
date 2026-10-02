@@ -8,30 +8,36 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+DEFAULT_LOCALE = "en-us"
+DEFAULT_OUT_DIR = "articles"
+
 
 @dataclass(frozen=True)
-class Config:
+class Settings:
     zendesk_host: str
     locale: str
     out_dir: Path
     max_articles: int | None
 
-
-def load_config() -> Config:
-    host = os.environ.get("ZENDESK_HOST", "").strip()
-    if not host:
-        raise SystemExit(
-            "ZENDESK_HOST is not set. Copy .env.sample to .env and fill it in."
+    @classmethod
+    def from_env(cls) -> "Settings":
+        host = _required("ZENDESK_HOST")
+        limit = os.environ.get("MAX_ARTICLES", "").strip()
+        return cls(
+            zendesk_host=_as_host(host),
+            locale=os.environ.get("ZENDESK_LOCALE", "").strip() or DEFAULT_LOCALE,
+            out_dir=Path(os.environ.get("OUT_DIR", "").strip() or DEFAULT_OUT_DIR),
+            max_articles=int(limit) if limit else None,
         )
 
-    # Accept a bare host or a pasted URL; we only ever need the host.
-    host = host.removeprefix("https://").removeprefix("http://").strip("/")
 
-    raw_max = os.environ.get("MAX_ARTICLES", "").strip()
+def _required(name: str) -> str:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise SystemExit(f"{name} is not set. Copy .env.sample to .env and fill it in.")
+    return value
 
-    return Config(
-        zendesk_host=host,
-        locale=os.environ.get("ZENDESK_LOCALE", "en-us").strip() or "en-us",
-        out_dir=Path(os.environ.get("OUT_DIR", "articles")),
-        max_articles=int(raw_max) if raw_max else None,
-    )
+
+def _as_host(value: str) -> str:
+    """Accept a bare host or a pasted URL; only the host is ever needed."""
+    return value.removeprefix("https://").removeprefix("http://").strip("/")
