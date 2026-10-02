@@ -48,11 +48,22 @@ Every run logs the file count and the chunk count embedded.
 
 ## Daily job
 
-_TODO: host, schedule, link to logs._
+Runs on **GitHub Actions**, `.github/workflows/daily-sync.yml`: cron `17 3 * * *` (03:17 UTC)
+daily, plus a manual trigger. It builds the image and runs the same container you run
+locally, so nothing about the scheduled path is special-cased.
 
-Each run logs `added / updated / skipped`. New and changed articles are detected by
-comparing a content hash against the previous run, so an unchanged Help Center costs no
-uploads.
+**Logs:** the Actions tab — every run links to its output, and each one ends with a summary
+of the counts. _TODO: paste the run URL here._
+
+Secrets the workflow needs: `ZENDESK_HOST`, `GEMINI_API_KEY`, `GEMINI_FILE_SEARCH_STORE`.
+
+Each run logs `added / updated / skipped`. New and changed articles are detected by comparing
+a content hash against what the store already holds, so an unchanged Help Center costs no
+uploads — a second run over 416 articles takes about a second and uploads nothing.
+
+Actions rather than one of the hosts the brief lists: it is free with no card, the cron is
+native, and the log link the brief asks for is just the run URL. The image is plain Docker,
+so the same `docker run` works on Fly.io or Cloud Run without changes.
 
 ## Notes
 
