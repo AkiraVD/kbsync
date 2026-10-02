@@ -65,14 +65,23 @@ articles takes about a second.
 
 ![The brief's question answered with citations in AI Studio](docs/screenshot-aistudio.jpg)
 
-Gemini's File Search has no Playground surface — AI Studio offers Search grounding, code
-execution and function calling, but no way to attach a store — so the capture above runs the
-same verbatim prompt against the generated Markdown, with every other tool switched off.
-Five bullets, the prompt's cap, and two real article URLs.
+**Why the Markdown is attached to the prompt there.** File Search is an API-only feature:
+AI Studio's Playground offers Search grounding, code execution, function calling, Maps and
+URL context, and nothing that can point at a store. Its Agents are no different — their
+sources are inline files, GCS buckets and repositories, which mount bytes into a sandbox
+rather than query an index. So the only way to put documents in front of the model in Studio
+is to attach them to the prompt, which is what the capture above does: the three relevant
+articles, the mandated system prompt, every other tool off. It demonstrates the prompt and
+the quality of the generated Markdown — not retrieval.
 
-The assistant proper is exercised through the API, and that transcript is in
-[`docs/screenshot-ask.txt`](docs/screenshot-ask.txt): same question, answered out of the
-vector store, with the `Article URL:` line the prompt asks for.
+Retrieval is demonstrated from the command line, where the store really is queried:
+[`docs/screenshot-ask.txt`](docs/screenshot-ask.txt).
+
+![The same question answered from the vector store](docs/screenshot-terminal.png)
+
+The difference is measurable rather than asserted. [`docs/retrieval-check.md`](docs/retrieval-check.md)
+asks one question both ways: against the store every value is exact and the citation
+resolves; without it the same model invents three sets of plausible settings and cites a 404.
 
 ## Notes
 
