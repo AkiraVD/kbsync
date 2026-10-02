@@ -65,38 +65,32 @@ articles takes about a second.
 
 ![The brief's question answered with citations in AI Studio](docs/screenshot-aistudio.jpg)
 
-**Why the Markdown is attached to the prompt there.** File Search is an API-only feature:
-AI Studio's Playground offers Search grounding, code execution, function calling, Maps and
-URL context, and nothing that can point at a store. Its Agents are no different — their
-sources are inline files, GCS buckets and repositories, which mount bytes into a sandbox
-rather than query an index. So the only way to put documents in front of the model in Studio
-is to attach them to the prompt, which is what the capture above does: the three relevant
-articles, the mandated system prompt, every other tool off. It demonstrates the prompt and
-the quality of the generated Markdown — not retrieval.
+**The articles are attached to that prompt because File Search has no UI.** Studio offers
+Search grounding, code execution, function calling, Maps and URL context, and nothing that
+points at a store; its Agents take inline files, GCS buckets or repositories, which mount
+bytes into a sandbox rather than query an index. Attaching the articles is the only way to
+put documents in front of the model there, so the capture proves the prompt and the Markdown
+— not retrieval.
 
-Retrieval is demonstrated from the command line, where the store really is queried:
-[`docs/screenshot-ask.txt`](docs/screenshot-ask.txt).
+Retrieval is proved from the command line, where the store really is queried:
 
 ![The same question answered from the vector store](docs/screenshot-terminal.png)
 
-The difference is measurable rather than asserted. [`docs/retrieval-check.md`](docs/retrieval-check.md)
-asks one question both ways: against the store every value is exact and the citation
-resolves; without it the same model invents three sets of plausible settings and cites a 404.
+and the difference is measured, not asserted. [`docs/retrieval-check.md`](docs/retrieval-check.md)
+asks one question both ways: grounded, four of four values exact and the citation resolves;
+ungrounded, the same model invents the settings and cites a 404.
 
 ## Notes
 
 - **Gemini rather than OpenAI** — both are allowed. File Search storage and query-time
   embeddings are free, so a daily job costs nothing.
 - **Uploads are plain REST calls**, never the dashboard: resumable start, finalise, wait for
-  the import, delete the document it replaced.
-- **State lives in the store**, not on disk. Nothing to mount, nothing lost when the
-  container exits.
-- **`articles/` is not committed.** It is regenerated every run, and the content belongs to
-  the Help Center it came from.
+  the import, drop the document it replaced.
+- **State lives in the store**, not on disk — nothing to mount, nothing lost when the
+  container exits. `articles/` is regenerated every run and is not committed.
 - **`GEMINI_MODEL` defaults to `gemini-flash-lite-latest`.** The free tier caps requests per
-  model per day, and `gemini-flash-latest` (which resolves to `gemini-3.8-flash`) allows 20 —
-  enough to exhaust on one eval run. Pinned versions also answered `503` under load. Quota
-  replies carry a `Retry-After` measured in hours, so the HTTP layer refuses any wait over a
-  minute instead of sleeping until tomorrow.
-- **Indexing is the slow part**, not answering: about 10s per document, so a first full index
-  of 416 articles takes roughly 70 minutes. Every run after that is a second.
+  model per day and `gemini-flash-latest` allows 20. Quota replies carry a `Retry-After`
+  measured in hours, so the HTTP layer refuses any wait over a minute rather than sleeping
+  until tomorrow.
+- **Indexing is the slow part**, not answering: ~10s per document, so a first index of 416
+  articles takes about 70 minutes. Every run after that is a second.
