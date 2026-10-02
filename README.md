@@ -92,5 +92,9 @@ ungrounded, the same model invents the settings and cites a 404.
   model per day and `gemini-flash-latest` allows 20. Quota replies carry a `Retry-After`
   measured in hours, so the HTTP layer refuses any wait over a minute rather than sleeping
   until tomorrow.
+- **Citation style varies run to run.** The prompt asks for `Article URL:` lines and usually
+  gets them, but the model sometimes renders the citation as a markdown link instead — which
+  is how the production OptiBot cites. The prompt is used verbatim regardless; this is an
+  observation, not a correction.
 - **Indexing is the slow part**, not answering: ~10s per document, so a first index of 416
   articles takes about 70 minutes. Every run after that is a second.
