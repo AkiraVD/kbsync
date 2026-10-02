@@ -6,6 +6,12 @@ primary_region = "sin"
 [build]
   dockerfile = "Dockerfile"
 
+# Without this, a Machine that exits gets restarted, which for a job means it
+# runs again immediately, and again - burning both money and API quota.
+[[restart]]
+  policy = "never"
+
+# Measured peak is about 50MB, so the cheapest preset has plenty of headroom.
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "512mb"
+  memory = "256mb"
