@@ -63,11 +63,16 @@ articles takes about a second.
 
 ## Screenshot
 
-![A cited answer](docs/screenshot.png)
+![The brief's question answered with citations in AI Studio](docs/screenshot-aistudio.jpg)
 
-The transcript is in [`docs/screenshot-ask.txt`](docs/screenshot-ask.txt): the brief's own
-question, five bullets (the prompt's cap), and an `Article URL:` line pointing at a real
-article.
+Gemini's File Search has no Playground surface — AI Studio offers Search grounding, code
+execution and function calling, but no way to attach a store — so the capture above runs the
+same verbatim prompt against the generated Markdown, with every other tool switched off.
+Five bullets, the prompt's cap, and two real article URLs.
+
+The assistant proper is exercised through the API, and that transcript is in
+[`docs/screenshot-ask.txt`](docs/screenshot-ask.txt): same question, answered out of the
+vector store, with the `Article URL:` line the prompt asks for.
 
 ## Notes
 
