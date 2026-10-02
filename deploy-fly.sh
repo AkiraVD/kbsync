@@ -12,14 +12,21 @@ if ! fly status -a "$APP" >/dev/null 2>&1; then
 fi
 
 # Straight from .env, so the key never reaches the shell history or a process list.
-grep -E "$KEYS" .env | fly secrets import -a "$APP"
+# Skipped when they are already set: `fly secrets import` reads app config from
+# existing Machines, so it fails on an app whose Machine has been destroyed.
+if fly secrets list -a "$APP" 2>/dev/null | grep -q GEMINI_API_KEY; then
+  echo "secrets already set"
+else
+  grep -E "$KEYS" .env | fly secrets import -a "$APP"
+fi
 
 build_args=(--build-only --push -a "$APP")
 if docker info >/dev/null 2>&1; then
   build_args+=(--local-only)
 fi
 
-image="$(fly deploy "${build_args[@]}" | tee /dev/stderr \
+# flyctl prints progress, and the image reference, on stderr.
+image="$(fly deploy "${build_args[@]}" 2>&1 | tee /dev/stderr \
   | sed -n 's/^image: //p' | tail -1)"
 
 if [ -z "$image" ]; then
