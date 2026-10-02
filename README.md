@@ -52,9 +52,10 @@ in the body for an answer to cite it. Each run logs files written and chunks emb
 `main.py` once, and stops. Deploy once with `./deploy-fly.sh` after
 `fly secrets set ZENDESK_HOST=... GEMINI_API_KEY=... GEMINI_FILE_SEARCH_STORE=...`.
 
-**Logs:** `fly logs -a kbsync`, or https://fly.io/apps/kbsync/monitoring — that page needs
-account access, so a transcript of a real scheduled run is in [`docs/run-log.md`](docs/run-log.md).
-Every run logs `added / updated / skipped`.
+**Logs:** https://fly.io/apps/kbsync/monitoring, or `fly logs -a kbsync`. That page needs a Fly
+account, so the last-run artefact is committed as [`docs/run-log.md`](docs/run-log.md) — the
+transcript of a real scheduled run, readable by anyone. Every run logs `added / updated /
+skipped`.
 
 Delta detection compares a sha256 of each converted body against the hash stored on the
 document in the store, so an unchanged Help Center costs no uploads: a second pass over 416
