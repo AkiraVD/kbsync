@@ -4,6 +4,7 @@ import argparse
 import logging
 import sys
 
+from src.assistant import Assistant
 from src.config import Settings
 from src.sync import sync
 from src.vectorstore import create_store
@@ -14,6 +15,9 @@ def main() -> int:
     args = _parse_args()
     settings = Settings.from_env()
     log = logging.getLogger("kbsync")
+
+    if args.ask:
+        return _ask(settings, args.ask, log)
 
     if args.create_store:
         name = create_store(
@@ -47,6 +51,25 @@ def main() -> int:
     return 0
 
 
+def _ask(settings: Settings, question: str, log: logging.Logger) -> int:
+    if not settings.uploads_enabled:
+        log.error("asking needs GEMINI_API_KEY and GEMINI_FILE_SEARCH_STORE")
+        return 1
+
+    assistant = Assistant(
+        settings.api_key, settings.store_name, settings.model, base_url=settings.base_url
+    )
+    answer = assistant.ask(question)
+
+    print(f"\nQ: {question}\n")
+    print(answer.text or "(no answer)")
+    if answer.citations:
+        print("\nRetrieved from:")
+        for citation in answer.citations:
+            print(f"  {citation}")
+    return 0
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -57,6 +80,9 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--create-store", metavar="NAME", help="create a File Search store, then exit"
+    )
+    parser.add_argument(
+        "--ask", metavar="QUESTION", help="ask the store a question, then exit"
     )
     return parser.parse_args()
 
