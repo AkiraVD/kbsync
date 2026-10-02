@@ -1,99 +1,78 @@
 # kbsync
 
 Daily one-way sync from a Zendesk Help Center into a Gemini File Search store, so an
-assistant can answer support questions from the current docs and cite them. Re-runs upload
+assistant answers support questions from the current docs and cites them. Each run uploads
 only what changed.
 
 ## Setup
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.sample .env     # fill in ZENDESK_HOST and GEMINI_API_KEY
+pip install -r requirements-dev.txt
+cp .env.sample .env                    # ZENDESK_HOST, GEMINI_API_KEY
 python main.py --create-store kbsync   # once; paste the name into .env
 ```
 
 ## Run locally
 
 ```bash
-python main.py          # fetch → Markdown → upload delta → print counts
+python main.py                      # full sync; --limit N for a quick pass
+python main.py --no-upload          # Markdown only, no API key needed
+python main.py --ask "How do I add a YouTube video?"
+pytest -q                           # 49 offline tests
+pytest -m eval                      # 6-case eval set; hits the API
 ```
 
-## Run in Docker
+With Docker, which is what the scheduled job runs:
 
 ```bash
 docker build -t kbsync .
-docker run --rm --env-file .env kbsync            # or: ... kbsync main.py
+docker run --rm --env-file .env kbsync      # or: ... kbsync main.py
 ```
 
-Runs once and exits 0. Exits 1 with a one-line message if required settings are missing.
+Runs once and exits 0; exits 1 with one line if required settings are missing.
 
 ## Chunking strategy
 
-Static chunks of **512 tokens with 128 overlap**, set per file through `chunkingConfig` on
-the upload call rather than left to the service default.
+**512 tokens per chunk, 128 overlap**, set per file through `chunkingConfig` rather than left
+to the service default. 512 is the service maximum, so the real decision was the overlap:
+articles are short procedures with headed sections, and 512 tokens usually holds one section
+whole. The 128-token overlap (25%) carries the end of one section into the next so a numbered
+sequence split across a boundary stays answerable, without storing a quarter of the corpus
+twice as a 50% overlap would. Both are configurable; a value over 512 is rejected locally
+rather than by the API.
 
-512 is the service maximum — File Search rejects anything larger — so the real decision was
-the overlap. Help Center articles are short procedures with headed sections, and a 512-token
-chunk usually holds one section whole. The 128-token overlap (25%) carries the end of one
-section into the start of the next, so a numbered sequence split across a boundary stays
-answerable, without storing half the corpus twice as a 50% overlap would. Both are
-configurable in `.env`, and a value over 512 is rejected locally rather than by the API.
-
-Each file leads with its title and an `Article URL:` line, repeated outside the YAML front
-matter. This is load-bearing: a File Search citation returns the matched **chunk text**, not
-a link, so the URL has to be in the body for the answer to cite it.
-
-Every run logs the file count and the chunk count embedded.
+Every file repeats its `Article URL:` outside the YAML front matter. That is load-bearing: a
+File Search citation hands back the matched **chunk text**, not a link, so the URL has to be
+in the body for an answer to cite it. Each run logs files written and chunks embedded.
 
 ## Daily job
 
-Runs on **GitHub Actions**, `.github/workflows/daily-sync.yml`: cron `17 3 * * *` (03:17 UTC)
-daily, plus a manual trigger. It builds the image and runs the same container you run
-locally, so nothing about the scheduled path is special-cased.
+`fly.toml` plus `deploy-fly.sh` create a Fly Machine with `--schedule daily`: it wakes, runs
+`main.py` once, and stops. Deploy once with `./deploy-fly.sh` after
+`fly secrets set ZENDESK_HOST=... GEMINI_API_KEY=... GEMINI_FILE_SEARCH_STORE=...`.
 
-**Logs:** the Actions tab — every run links to its output, and each one ends with a summary
-of the counts. _TODO: paste the run URL here._
+**Logs:** `fly logs -a kbsync`, or https://fly.io/apps/kbsync/monitoring — that page needs
+account access, so a transcript of a real scheduled run is in [`docs/run-log.md`](docs/run-log.md).
+Every run logs `added / updated / skipped`.
 
-Secrets the workflow needs: `ZENDESK_HOST`, `GEMINI_API_KEY`, `GEMINI_FILE_SEARCH_STORE`.
+Delta detection compares a sha256 of each converted body against the hash stored on the
+document in the store, so an unchanged Help Center costs no uploads: a second pass over 416
+articles takes about a second.
 
-Each run logs `added / updated / skipped`. New and changed articles are detected by comparing
-a content hash against what the store already holds, so an unchanged Help Center costs no
-uploads — a second run over 416 articles takes about a second and uploads nothing.
+## Screenshot
 
-Actions rather than one of the hosts the brief lists: it is free with no card, the cron is
-native, and the log link the brief asks for is just the run URL. The image is plain Docker,
-so the same `docker run` works on Fly.io or Cloud Run without changes.
+_TODO: `--ask "How do I add a YouTube video?"` showing the answer and its Article URL._
 
 ## Notes
 
-- **Gemini rather than OpenAI.** Both are permitted. Gemini File Search gives a vector store
-  with free storage and free query-time embeddings, and its API covers everything the job
-  needs: `customMetadata` per document carries the content hash that drives the delta, and
-  `chunkingConfig` sets the chunking strategy explicitly.
-- **Delta state lives in the store, not on disk.** Each document carries its article id and
-  body hash as metadata, so a run lists the store, compares hashes and uploads only what
-  differs. The container needs no volume and loses nothing when it exits.
-- **Uploads are plain REST calls**, not a dashboard drag-and-drop: start a resumable upload,
-  finalise it, wait for the import operation, delete the document it replaced.
-- The fetched Markdown is **not committed**. `articles/` is gitignored: the content belongs
-  to the Help Center it came from, and every run regenerates it. Counts are in the run log.
-- The source Help Center is configuration (`ZENDESK_HOST`), not a constant, so this repo
-  carries no vendor-specific strings.
-
-## Tests
-
-```bash
-pytest -q              # 49 offline tests, no key needed
-pytest -m eval         # the 6-case eval set; hits the API, needs a populated store
-```
-
-The eval set comes from real conversations with the live bot. One case asks about
-unsupported "SmartBridge" hardware and asserts no article URL is invented: anything the
-answer cites is checked against the manifest.
-
-## Notes on the model
-
-`GEMINI_MODEL` defaults to `gemini-flash-latest`. Pinned versions returned
-`503 service_unavailable` ("experiencing high demand") on the free tier while
-`gemini-flash-latest` answered, and the HTTP layer retries 429/503 honouring `Retry-After`.
+- **Gemini rather than OpenAI** — both are allowed. File Search storage and query-time
+  embeddings are free, so a daily job costs nothing.
+- **Uploads are plain REST calls**, never the dashboard: resumable start, finalise, wait for
+  the import, delete the document it replaced.
+- **State lives in the store**, not on disk. Nothing to mount, nothing lost when the
+  container exits.
+- **`articles/` is not committed.** It is regenerated every run, and the content belongs to
+  the Help Center it came from.
+- `GEMINI_MODEL` defaults to `gemini-flash-latest`; pinned versions returned
+  `503 service_unavailable` on the free tier.

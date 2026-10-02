@@ -1,0 +1,11 @@
+# A scheduled job, not a server: no services, no ports. The Machine wakes on
+# its schedule, runs main.py once, and stops.
+app = "kbsync"
+primary_region = "sin"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
