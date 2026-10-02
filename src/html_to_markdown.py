@@ -83,6 +83,21 @@ def _link_embeds(soup: BeautifulSoup) -> None:
         frame.replace_with(link)
 
 
+def _drop_data_uris(soup: BeautifulSoup) -> None:
+    """An inline base64 image is a binary blob, not content.
+
+    One article carried a 125KB PNG this way, which made the file seven times
+    larger than any other and timed out every upload attempt.
+    """
+    for tag in soup.find_all(["img", "a"]):
+        target = tag.get("src") or tag.get("href") or ""
+        if not target.startswith("data:"):
+            continue
+
+        label = tag.get("alt") or tag.get_text(strip=True)
+        tag.replace_with(label) if label else tag.decompose()
+
+
 def _demote_body_headings(soup: BeautifulSoup) -> None:
     for tag in soup.find_all("h1"):
         tag.name = "h2"
@@ -100,6 +115,7 @@ RULES = (
     _drop_inpage_contents,
     _quote_callouts,
     _link_embeds,
+    _drop_data_uris,
     _demote_body_headings,
     _strip_attributes,
 )

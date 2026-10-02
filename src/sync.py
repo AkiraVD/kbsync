@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 
 def sync(settings: Settings, limit: int | None = None, upload: bool = True) -> SyncReport:
-    cap = limit or settings.max_articles
+    cap = limit if limit is not None else settings.max_articles
     documents = _collect(settings, cap)
     store = ArticleStore(settings.out_dir)
     store.prepare()

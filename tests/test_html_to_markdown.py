@@ -73,3 +73,24 @@ def test_body_h1_is_demoted_so_the_title_stays_unique():
 
 def test_empty_body_is_handled():
     assert convert("") == "\n"
+
+
+def test_inline_base64_image_is_dropped():
+    html = '<p><img src="data:image/png;base64,iVBORw0KGgoAAAANS" alt=""></p><p>Scan it.</p>'
+
+    out = convert(html)
+
+    assert "base64" not in out
+    assert out == "Scan it.\n"
+
+
+def test_inline_base64_image_keeps_its_alt_text():
+    html = '<p><img src="data:image/png;base64,iVBORw0K" alt="The QR code"></p>'
+
+    assert convert(html) == "The QR code\n"
+
+
+def test_a_normal_image_url_is_untouched():
+    html = '<p><img src="https://example.test/a.png" alt="Add"></p>'
+
+    assert convert(html) == "![Add](https://example.test/a.png)\n"

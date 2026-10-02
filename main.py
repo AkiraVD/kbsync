@@ -88,7 +88,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--ask", metavar="QUESTION", help="ask the store a question, then exit"
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.limit is not None and args.limit < 1:
+        parser.error("--limit must be at least 1")
+    return args
 
 
 def _setup_logging() -> None:

@@ -23,6 +23,7 @@ DEFAULT_EMBEDDING_MODEL = "models/gemini-embedding-2"
 CHARS_PER_TOKEN = 4
 PAGE_SIZE = 20
 MAX_CHUNK_TOKENS = 512
+REQUEST_TIMEOUT = 60
 IMPORT_POLL_SECONDS = 3
 IMPORT_TIMEOUT_SECONDS = 300
 
@@ -92,7 +93,7 @@ class VectorStore:
         self.store = store_name
         self.chunking = chunking
         self.base_url = base_url.rstrip("/")
-        self.client = Client({"x-goog-api-key": api_key}, timeout=120)
+        self.client = Client({"x-goog-api-key": api_key}, timeout=REQUEST_TIMEOUT)
 
     def fetch_files(self) -> dict[str, RemoteFile]:
         """Article id -> the document the store already holds for it."""
