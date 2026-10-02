@@ -82,3 +82,20 @@ def test_a_client_error_is_not_retried():
     with pytest.raises(requests.HTTPError):
         client.get("https://api.test/thing")
     assert client.session.attempts == 1
+
+
+def test_a_quota_sized_retry_after_is_not_slept_through(monkeypatch):
+    """A daily quota answers in hours; waiting is indistinguishable from a hang."""
+    slept: list[int] = []
+    monkeypatch.setattr("src.http.time.sleep", slept.append)
+
+    quota = FakeResponse(status_code=429)
+    quota.headers = {"Retry-After": "43369"}
+    quota.text = '{"error":{"message":"20 requests per day on Free Tier"}}'
+    client = _client([quota])
+
+    with pytest.raises(requests.HTTPError, match="429"):
+        client.get("https://api.test/thing")
+
+    assert slept == [], "no sleep should have happened"
+    assert client.session.attempts == 1

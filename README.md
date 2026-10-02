@@ -62,7 +62,11 @@ articles takes about a second.
 
 ## Screenshot
 
-_TODO: `--ask "How do I add a YouTube video?"` showing the answer and its Article URL._
+![A cited answer](docs/screenshot.png)
+
+The transcript is in [`docs/screenshot-ask.txt`](docs/screenshot-ask.txt): the brief's own
+question, five bullets (the prompt's cap), and an `Article URL:` line pointing at a real
+article.
 
 ## Notes
 
@@ -74,5 +78,10 @@ _TODO: `--ask "How do I add a YouTube video?"` showing the answer and its Articl
   container exits.
 - **`articles/` is not committed.** It is regenerated every run, and the content belongs to
   the Help Center it came from.
-- `GEMINI_MODEL` defaults to `gemini-flash-latest`; pinned versions returned
-  `503 service_unavailable` on the free tier.
+- **`GEMINI_MODEL` defaults to `gemini-flash-lite-latest`.** The free tier caps requests per
+  model per day, and `gemini-flash-latest` (which resolves to `gemini-3.8-flash`) allows 20 —
+  enough to exhaust on one eval run. Pinned versions also answered `503` under load. Quota
+  replies carry a `Retry-After` measured in hours, so the HTTP layer refuses any wait over a
+  minute instead of sleeping until tomorrow.
+- **Indexing is the slow part**, not answering: about 10s per document, so a first full index
+  of 416 articles takes roughly 70 minutes. Every run after that is a second.

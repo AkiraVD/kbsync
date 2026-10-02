@@ -10,6 +10,7 @@ log = logging.getLogger(__name__)
 RETRY_STATUSES = (429, 500, 502, 503, 504)
 RETRY_ERRORS = (requests.Timeout, requests.ConnectionError)
 MAX_ATTEMPTS = 4
+MAX_RETRY_WAIT = 60
 
 
 class Client:
@@ -54,15 +55,20 @@ class Client:
 
             if response.status_code in RETRY_STATUSES and attempt < MAX_ATTEMPTS:
                 wait = int(response.headers.get("Retry-After", 2**attempt))
+                # A daily quota answers Retry-After in hours. Waiting that out is
+                # indistinguishable from a hang, so report it and stop.
+                if wait > MAX_RETRY_WAIT:
+                    log.error("%s on %s asks for a %ss wait", response.status_code, url, wait)
+                    break
                 log.warning("%s on %s, retrying in %ss", response.status_code, url, wait)
                 time.sleep(wait)
                 continue
 
-            if not response.ok:
-                raise requests.HTTPError(
-                    f"{response.status_code} from {url}: {response.text[:300]}",
-                    response=response,
-                )
-            return response
+            break
 
-        raise RuntimeError("unreachable")
+        if not response.ok:
+            raise requests.HTTPError(
+                f"{response.status_code} from {url}: {response.text[:300]}",
+                response=response,
+            )
+        return response

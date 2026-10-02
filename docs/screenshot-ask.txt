@@ -1,0 +1,16 @@
+2026-10-02T19:00:22 WARNING 429 on https://generativelanguage.googleapis.com/v1beta/interactions, retrying in 30s
+
+Q: How do I add a YouTube video?
+
+To add a YouTube video to OptiSigns, follow these steps:
+
+* Log in to the OptiSigns portal, go to **Files/Assets**, and click **Apps**.
+* Search for and select the **YouTube** app.
+* Enter a **Name** for your asset (optional; if left blank, it uses the video's title).
+* Paste your YouTube video link, share link, or Shorts link into the **URL** field.
+* Configure any desired display or playback options (such as captions or start/end times), then click **Save**.
+
+Article URL: https://support.optisigns.com/hc/en-us/articles/360051014713-How-to-Use-YouTube-with-OptiSigns
+
+Retrieved from:
+  how-to-use-youtube-with-optisigns.md  https://support.optisigns.com/hc/en-us/articles/360051014713-How-to-Use-YouTube-with-OptiSigns

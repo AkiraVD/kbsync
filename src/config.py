@@ -14,7 +14,7 @@ DEFAULT_LOCALE = "en-us"
 DEFAULT_OUT_DIR = "articles"
 DEFAULT_CHUNK_TOKENS = 512
 DEFAULT_OVERLAP_TOKENS = 128
-DEFAULT_MODEL = "gemini-flash-latest"
+DEFAULT_MODEL = "gemini-flash-lite-latest"
 
 
 @dataclass(frozen=True)
