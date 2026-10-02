@@ -1,4 +1,4 @@
-"""One run of the pipeline: fetch, convert, write, report."""
+"""One run of the pipeline: fetch, convert, write, upload the delta, report."""
 
 import logging
 
@@ -6,36 +6,76 @@ from .config import Settings
 from .documents import build_all
 from .helpcenter import HelpCenter
 from .manifest import Manifest
-from .models import Article, SyncReport
+from .models import Article, Document, Status, SyncReport
+from .state import StateStore, VectorStoreState
 from .store import ArticleStore
+from .vectorstore import VectorStore
 
 log = logging.getLogger(__name__)
 
 
-def sync(settings: Settings, limit: int | None = None) -> SyncReport:
-    client = HelpCenter(settings.zendesk_host, settings.locale)
-    sections = client.fetch_sections()
-    payloads = client.fetch_articles(limit=limit or settings.max_articles)
-
-    articles = [Article.from_api(payload, sections) for payload in payloads]
-    documents = build_all(articles)
-
+def sync(settings: Settings, limit: int | None = None, upload: bool = True) -> SyncReport:
+    cap = limit or settings.max_articles
+    documents = _collect(settings, cap)
     store = ArticleStore(settings.out_dir)
     store.prepare()
+
     manifest = Manifest.load(settings.out_dir)
+    uploader = _uploader(settings) if upload else None
+    state: StateStore = (
+        VectorStoreState(uploader.fetch_files()) if uploader else manifest
+    )
+
     report = SyncReport()
-
     for document in documents:
-        report.record(manifest.status(document), document.slug)
-        manifest.record(document)
-        # Every document is written so a fresh checkout holds the whole corpus;
-        # the status only decides what a later step has to re-upload.
+        status = state.status(document)
         store.write(document)
+        manifest.record(document)
 
-    manifest.save(settings.out_dir)
-    report.stale = store.stale_files({document.slug for document in documents})
+        if uploader and status is not Status.SKIPPED:
+            _upload(uploader, state, document, report)
 
-    if report.stale:
-        log.info("%d file(s) no longer published: %s", len(report.stale), ", ".join(report.stale))
+        report.record(status, document.slug)
+
+    manifest.save(settings.out_dir, prune=not cap)
+
+    # Only a full run can tell an unpublished article from one we never asked for.
+    if not cap:
+        report.stale = store.stale_files({document.slug for document in documents})
+        _log_stale(report.stale)
 
     return report
+
+
+def _log_stale(stale: list[str], examples: int = 5) -> None:
+    if not stale:
+        return
+    shown = ", ".join(stale[:examples])
+    more = f" (+{len(stale) - examples} more)" if len(stale) > examples else ""
+    log.info("%d file(s) no longer published: %s%s", len(stale), shown, more)
+
+
+def _collect(settings: Settings, limit: int | None) -> list[Document]:
+    client = HelpCenter(settings.zendesk_host, settings.locale)
+    sections = client.fetch_sections()
+    payloads = client.fetch_articles(limit=limit)
+    return build_all(Article.from_api(payload, sections) for payload in payloads)
+
+
+def _uploader(settings: Settings) -> VectorStore | None:
+    if not settings.uploads_enabled:
+        log.info("no OpenAI credentials, writing Markdown only")
+        return None
+    return VectorStore(
+        settings.openai_api_key, settings.vector_store_id, settings.chunking
+    )
+
+
+def _upload(
+    uploader: VectorStore, state: StateStore, document: Document, report: SyncReport
+) -> None:
+    replacing = state.existing(document) if isinstance(state, VectorStoreState) else None
+    uploader.put(document, replacing=replacing)
+    report.uploaded += 1
+    report.chunks += uploader.chunking.estimate_chunks(document.text)
+    log.info("uploaded %s", document.filename)

@@ -22,14 +22,26 @@ python main.py          # fetch → Markdown → upload delta → print counts
 
 ```bash
 docker build -t kbsync .
-docker run --rm --env-file .env kbsync
+docker run --rm --env-file .env kbsync            # or: ... kbsync main.py
 ```
 
-Runs once and exits 0.
+Runs once and exits 0. Exits 1 with a one-line message if required settings are missing.
 
 ## Chunking strategy
 
-_TODO: size, overlap, and why — plus files and chunks embedded per run._
+Static chunks of **800 tokens with 200 overlap**, set per file through
+`chunking_strategy` on the attach call rather than left to `auto` (which uses 800/400).
+
+Help Center articles are short procedures — a few hundred to a couple of thousand tokens —
+so 800 keeps a whole numbered procedure, with its heading, inside one chunk. The 200-token
+overlap carries the end of one section into the next so a step sequence split across a
+boundary stays answerable; `auto`'s 400 would have doubled the stored copy of every article
+for no gain on documents this size. Both are configurable in `.env`.
+
+Each file leads with its title and an `Article URL:` line, repeated outside the YAML front
+matter, so whichever chunk a search returns still carries the citation.
+
+Every run logs the file count and the chunk count embedded.
 
 ## Daily job
 

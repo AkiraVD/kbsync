@@ -1,4 +1,4 @@
-"""Sync a Zendesk Help Center into clean Markdown. Runs once and exits."""
+"""Sync a Zendesk Help Center into a vector store. Runs once and exits."""
 
 import argparse
 import logging
@@ -17,7 +17,7 @@ def main() -> int:
     log.info(
         "syncing %s (%s) into %s", settings.zendesk_host, settings.locale, settings.out_dir
     )
-    report = sync(settings, limit=args.limit)
+    report = sync(settings, limit=args.limit, upload=not args.no_upload)
 
     if not report.total:
         log.error("the API returned no published articles")
@@ -25,6 +25,14 @@ def main() -> int:
 
     log.info("wrote %d Markdown files to %s", report.total, settings.out_dir)
     log.info("%s", report.summary())
+    if report.uploaded:
+        log.info(
+            "embedded %d file(s), ~%d chunks at %d tokens with %d overlap",
+            report.uploaded,
+            report.chunks,
+            settings.chunking.max_tokens,
+            settings.chunking.overlap_tokens,
+        )
     return 0
 
 
@@ -32,6 +40,9 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--limit", type=int, help="stop after N articles (default: every published one)"
+    )
+    parser.add_argument(
+        "--no-upload", action="store_true", help="write Markdown without uploading"
     )
     return parser.parse_args()
 

@@ -45,8 +45,10 @@ class Manifest:
             "content_hash": document.content_hash,
         }
 
-    def save(self, directory: Path) -> None:
-        payload = {"count": len(self.current), "articles": self.current}
+    def save(self, directory: Path, prune: bool = True) -> None:
+        """A partial run merges; only a full run may drop what it did not see."""
+        articles = self.current if prune else {**self.previous, **self.current}
+        payload = {"count": len(articles), "articles": articles}
         (directory / FILENAME).write_text(
             json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8"
         )

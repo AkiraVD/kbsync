@@ -5,24 +5,19 @@ scraping here: one request per 100 records, and raw payloads out.
 """
 
 import logging
-import time
 
-import requests
+from .http import Client
 
 log = logging.getLogger(__name__)
 
 PER_PAGE = 100
-MAX_ATTEMPTS = 4
-RETRY_STATUSES = (429, 500, 502, 503, 504)
 
 
 class HelpCenter:
-    def __init__(self, host: str, locale: str = "en-us", timeout: int = 30):
+    def __init__(self, host: str, locale: str = "en-us"):
         self.base = f"https://{host}/api/v2/help_center"
         self.locale = locale
-        self.timeout = timeout
-        self.session = requests.Session()
-        self.session.headers["Accept"] = "application/json"
+        self.client = Client()
 
     def fetch_articles(self, limit: int | None = None) -> list[dict]:
         articles = []
@@ -49,22 +44,7 @@ class HelpCenter:
         params: dict | None = {"per_page": PER_PAGE}
 
         while url:
-            payload = self._get(url, params)
+            payload = self.client.get(url, params)
             yield from payload.get(key, [])
             url = payload.get("next_page")
             params = None
-
-    def _get(self, url: str, params: dict | None = None) -> dict:
-        for attempt in range(1, MAX_ATTEMPTS + 1):
-            response = self.session.get(url, params=params, timeout=self.timeout)
-
-            if response.status_code in RETRY_STATUSES and attempt < MAX_ATTEMPTS:
-                wait = int(response.headers.get("Retry-After", 2**attempt))
-                log.warning("%s on %s, retrying in %ss", response.status_code, url, wait)
-                time.sleep(wait)
-                continue
-
-            response.raise_for_status()
-            return response.json()
-
-        raise RuntimeError("unreachable")

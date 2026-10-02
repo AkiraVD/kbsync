@@ -38,3 +38,29 @@ def test_unreadable_manifest_is_ignored(tmp_path, make_article):
     (tmp_path / "manifest.json").write_text("{not json", encoding="utf-8")
 
     assert Manifest.load(tmp_path).status(build(make_article())) is Status.ADDED
+
+
+def test_partial_run_keeps_articles_it_did_not_see(tmp_path, make_article):
+    first = Manifest()
+    first.record(build(make_article(id=1)))
+    first.record(build(make_article(id=2)))
+    first.save(tmp_path)
+
+    partial = Manifest.load(tmp_path)
+    partial.record(build(make_article(id=1)))
+    partial.save(tmp_path, prune=False)
+
+    assert set(Manifest.load(tmp_path).previous) == {"1", "2"}
+
+
+def test_full_run_drops_articles_that_are_gone(tmp_path, make_article):
+    first = Manifest()
+    first.record(build(make_article(id=1)))
+    first.record(build(make_article(id=2)))
+    first.save(tmp_path)
+
+    full = Manifest.load(tmp_path)
+    full.record(build(make_article(id=1)))
+    full.save(tmp_path)
+
+    assert set(Manifest.load(tmp_path).previous) == {"1"}

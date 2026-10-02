@@ -51,6 +51,8 @@ class SyncReport:
         default_factory=lambda: {status: [] for status in Status}
     )
     stale: list[str] = field(default_factory=list)
+    uploaded: int = 0
+    chunks: int = 0
 
     def record(self, status: Status, slug: str) -> None:
         self.by_status[status].append(slug)
