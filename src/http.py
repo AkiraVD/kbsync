@@ -24,6 +24,10 @@ class Client:
     def post(self, url: str, **kwargs) -> dict:
         return self._json("POST", url, **kwargs)
 
+    def post_raw(self, url: str, **kwargs) -> requests.Response:
+        """For calls whose answer is in the response headers."""
+        return self._request("POST", url, **kwargs)
+
     def delete(self, url: str) -> dict:
         return self._json("DELETE", url)
 

@@ -6,6 +6,7 @@ import sys
 
 from src.config import Settings
 from src.sync import sync
+from src.vectorstore import create_store
 
 
 def main() -> int:
@@ -13,6 +14,16 @@ def main() -> int:
     args = _parse_args()
     settings = Settings.from_env()
     log = logging.getLogger("kbsync")
+
+    if args.create_store:
+        name = create_store(
+            settings.api_key,
+            args.create_store,
+            base_url=settings.base_url,
+            embedding_model=settings.embedding_model,
+        )
+        log.info("created %s - put it in GEMINI_FILE_SEARCH_STORE", name)
+        return 0
 
     log.info(
         "syncing %s (%s) into %s", settings.zendesk_host, settings.locale, settings.out_dir
@@ -43,6 +54,9 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--no-upload", action="store_true", help="write Markdown without uploading"
+    )
+    parser.add_argument(
+        "--create-store", metavar="NAME", help="create a File Search store, then exit"
     )
     return parser.parse_args()
 

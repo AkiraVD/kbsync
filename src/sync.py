@@ -64,10 +64,13 @@ def _collect(settings: Settings, limit: int | None) -> list[Document]:
 
 def _uploader(settings: Settings) -> VectorStore | None:
     if not settings.uploads_enabled:
-        log.info("no OpenAI credentials, writing Markdown only")
+        log.info("no File Search credentials, writing Markdown only")
         return None
     return VectorStore(
-        settings.openai_api_key, settings.vector_store_id, settings.chunking
+        settings.api_key,
+        settings.store_name,
+        settings.chunking,
+        base_url=settings.base_url,
     )
 
 

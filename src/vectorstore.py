@@ -1,12 +1,14 @@
-"""Upload documents to an OpenAI vector store over the REST API.
+"""Upload documents to a Gemini File Search store over the REST API.
 
-The brief rules out the dashboard, so every call here is explicit: create the
-file, attach it to the store with our chunking strategy and attributes, then
-drop the version it replaced.
+The brief rules out dashboard uploads, so every step is explicit: start a
+resumable upload, finalise it, wait for the import operation, then drop the
+document version it replaced. The API key travels as a header, never in a URL,
+so nothing secret reaches the logs.
 """
 
 import logging
 import math
+import time
 from dataclasses import dataclass
 
 from .http import Client
@@ -14,15 +16,17 @@ from .models import Document
 
 log = logging.getLogger(__name__)
 
-API_ROOT = "https://api.openai.com/v1"
-FILE_PURPOSE = "assistants"
-PER_PAGE = 100
+DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
+DEFAULT_EMBEDDING_MODEL = "models/gemini-embedding-2"
 CHARS_PER_TOKEN = 4
+PAGE_SIZE = 100
+IMPORT_POLL_SECONDS = 3
+IMPORT_TIMEOUT_SECONDS = 300
 
 
 @dataclass(frozen=True)
 class RemoteFile:
-    file_id: str
+    remote_id: str
     content_hash: str
 
 
@@ -33,11 +37,10 @@ class Chunking:
 
     def as_param(self) -> dict:
         return {
-            "type": "static",
-            "static": {
-                "max_chunk_size_tokens": self.max_tokens,
-                "chunk_overlap_tokens": self.overlap_tokens,
-            },
+            "whiteSpaceConfig": {
+                "maxTokensPerChunk": self.max_tokens,
+                "maxOverlapTokens": self.overlap_tokens,
+            }
         }
 
     def estimate_chunks(self, text: str) -> int:
@@ -46,83 +49,143 @@ class Chunking:
         return max(1, math.ceil((tokens - self.overlap_tokens) / stride))
 
 
+def create_store(
+    api_key: str,
+    display_name: str,
+    base_url: str = DEFAULT_BASE_URL,
+    embedding_model: str = DEFAULT_EMBEDDING_MODEL,
+) -> str:
+    """Create a store and return the resource name to put in .env."""
+    client = Client({"x-goog-api-key": api_key})
+    payload = client.post(
+        f"{base_url.rstrip('/')}/fileSearchStores",
+        json={"displayName": display_name, "embeddingModel": embedding_model},
+    )
+    return payload["name"]
+
+
 class VectorStore:
-    def __init__(self, api_key: str, vector_store_id: str, chunking: Chunking):
-        self.id = vector_store_id
+    def __init__(
+        self,
+        api_key: str,
+        store_name: str,
+        chunking: Chunking,
+        base_url: str = DEFAULT_BASE_URL,
+    ):
+        self.store = store_name
         self.chunking = chunking
-        self.client = Client({"Authorization": f"Bearer {api_key}"}, timeout=120)
+        self.base_url = base_url.rstrip("/")
+        self.client = Client({"x-goog-api-key": api_key}, timeout=120)
 
     def fetch_files(self) -> dict[str, RemoteFile]:
-        """Article id -> the file the store already holds for it."""
+        """Article id -> the document the store already holds for it."""
         files: dict[str, RemoteFile] = {}
 
-        for payload in self._paginate(f"{API_ROOT}/vector_stores/{self.id}/files"):
-            attributes = payload.get("attributes") or {}
-            article_id = attributes.get("article_id")
+        for payload in self._paginate(f"{self.base_url}/{self.store}/documents"):
+            metadata = _read_metadata(payload.get("customMetadata") or [])
+            article_id = metadata.get("article_id")
             if article_id is None:
                 continue
             files[str(article_id)] = RemoteFile(
-                file_id=payload["id"],
-                content_hash=str(attributes.get("content_hash", "")),
+                remote_id=payload["name"],
+                content_hash=str(metadata.get("content_hash", "")),
             )
 
-        log.info("vector store holds %d files with known article ids", len(files))
+        log.info("store holds %d documents with known article ids", len(files))
         return files
 
     def put(self, document: Document, replacing: RemoteFile | None = None) -> str:
-        file_id = self._create_file(document)
-        self._attach(file_id, document)
+        operation = self._upload(document)
+        name = self._await_import(operation)
         if replacing:
-            self._discard(replacing.file_id)
-        return file_id
+            self._discard(replacing.remote_id)
+        return name
 
-    def _create_file(self, document: Document) -> str:
-        payload = self.client.post(
-            f"{API_ROOT}/files",
-            files={
-                "file": (
-                    document.filename,
-                    document.text.encode("utf-8"),
-                    "text/markdown",
-                )
+    def _upload(self, document: Document) -> dict:
+        body = document.text.encode("utf-8")
+        upload_url = self._start_upload(document, len(body))
+
+        return self.client.post(
+            upload_url,
+            data=body,
+            headers={
+                "X-Goog-Upload-Offset": "0",
+                "X-Goog-Upload-Command": "upload, finalize",
             },
-            data={"purpose": FILE_PURPOSE},
         )
-        return payload["id"]
 
-    def _attach(self, file_id: str, document: Document) -> None:
-        self.client.post(
-            f"{API_ROOT}/vector_stores/{self.id}/files",
+    def _start_upload(self, document: Document, size: int) -> str:
+        response = self.client.post_raw(
+            self._upload_endpoint(),
             json={
-                "file_id": file_id,
-                "chunking_strategy": self.chunking.as_param(),
-                "attributes": _attributes(document),
+                "displayName": document.filename,
+                "customMetadata": _metadata(document),
+                "chunkingConfig": self.chunking.as_param(),
+            },
+            headers={
+                "X-Goog-Upload-Protocol": "resumable",
+                "X-Goog-Upload-Command": "start",
+                "X-Goog-Upload-Header-Content-Length": str(size),
+                "X-Goog-Upload-Header-Content-Type": "text/markdown",
             },
         )
 
-    def _discard(self, file_id: str) -> None:
-        self.client.delete(f"{API_ROOT}/vector_stores/{self.id}/files/{file_id}")
-        self.client.delete(f"{API_ROOT}/files/{file_id}")
+        url = response.headers.get("x-goog-upload-url")
+        if not url:
+            raise RuntimeError(f"no upload url returned for {document.filename}")
+        return url
+
+    def _await_import(self, operation: dict) -> str:
+        name = operation.get("name", "")
+        if operation.get("done") or not name:
+            return name
+
+        deadline = time.monotonic() + IMPORT_TIMEOUT_SECONDS
+        while time.monotonic() < deadline:
+            time.sleep(IMPORT_POLL_SECONDS)
+            status = self.client.get(f"{self.base_url}/{name}")
+            if status.get("done"):
+                if "error" in status:
+                    raise RuntimeError(f"import failed: {status['error']}")
+                return name
+
+        raise TimeoutError(f"import did not finish within {IMPORT_TIMEOUT_SECONDS}s")
+
+    def _discard(self, document_name: str) -> None:
+        self.client.delete(f"{self.base_url}/{document_name}?force=true")
+
+    def _upload_endpoint(self) -> str:
+        root, _, version = self.base_url.rpartition("/")
+        return f"{root}/upload/{version}/{self.store}:uploadToFileSearchStore"
 
     def _paginate(self, url: str):
-        params: dict = {"limit": PER_PAGE}
+        params: dict = {"pageSize": PAGE_SIZE}
 
         while True:
             payload = self.client.get(url, params)
-            data = payload.get("data", [])
-            yield from data
-            if not payload.get("has_more") or not data:
+            yield from payload.get("documents", [])
+            token = payload.get("nextPageToken")
+            if not token:
                 return
-            params = {"limit": PER_PAGE, "after": data[-1]["id"]}
+            params = {"pageSize": PAGE_SIZE, "pageToken": token}
 
 
-def _attributes(document: Document) -> dict:
+def _metadata(document: Document) -> list[dict]:
     article = document.article
-    return {
+    pairs = {
         "article_id": str(article.id),
         "slug": document.slug,
-        "title": article.title[:512],
-        "url": article.url[:512],
+        "title": article.title[:256],
+        "url": article.url[:256],
         "updated_at": article.updated_at,
         "content_hash": document.content_hash,
+    }
+    return [{"key": key, "stringValue": value} for key, value in pairs.items()]
+
+
+def _read_metadata(entries: list[dict]) -> dict[str, str]:
+    return {
+        entry["key"]: entry.get("stringValue", entry.get("numericValue", ""))
+        for entry in entries
+        if "key" in entry
     }
