@@ -30,17 +30,19 @@ Runs once and exits 0. Exits 1 with a one-line message if required settings are 
 
 ## Chunking strategy
 
-Static chunks of **800 tokens with 200 overlap**, set per file through `chunkingConfig`
-on the upload call rather than left to the service default.
+Static chunks of **512 tokens with 128 overlap**, set per file through `chunkingConfig` on
+the upload call rather than left to the service default.
 
-Help Center articles are short procedures — a few hundred to a couple of thousand tokens —
-so 800 keeps a whole numbered procedure, with its heading, inside one chunk. The 200-token
-overlap carries the end of one section into the next so a step sequence split across a
-boundary stays answerable, without doubling the stored copy of every article the way a 50%
-overlap would. Both are configurable in `.env`.
+512 is the service maximum — File Search rejects anything larger — so the real decision was
+the overlap. Help Center articles are short procedures with headed sections, and a 512-token
+chunk usually holds one section whole. The 128-token overlap (25%) carries the end of one
+section into the start of the next, so a numbered sequence split across a boundary stays
+answerable, without storing half the corpus twice as a 50% overlap would. Both are
+configurable in `.env`, and a value over 512 is rejected locally rather than by the API.
 
 Each file leads with its title and an `Article URL:` line, repeated outside the YAML front
-matter, so whichever chunk a search returns still carries the citation.
+matter. This is load-bearing: a File Search citation returns the matched **chunk text**, not
+a link, so the URL has to be in the body for the answer to cite it.
 
 Every run logs the file count and the chunk count embedded.
 
@@ -71,5 +73,16 @@ uploads.
 ## Tests
 
 ```bash
-pytest -q
+pytest -q              # 49 offline tests, no key needed
+pytest -m eval         # the 6-case eval set; hits the API, needs a populated store
 ```
+
+The eval set comes from real conversations with the live bot. One case asks about
+unsupported "SmartBridge" hardware and asserts no article URL is invented: anything the
+answer cites is checked against the manifest.
+
+## Notes on the model
+
+`GEMINI_MODEL` defaults to `gemini-flash-latest`. Pinned versions returned
+`503 service_unavailable` ("experiencing high demand") on the free tier while
+`gemini-flash-latest` answered, and the HTTP layer retries 429/503 honouring `Retry-After`.

@@ -66,7 +66,7 @@ def _ask(settings: Settings, question: str, log: logging.Logger) -> int:
     if answer.citations:
         print("\nRetrieved from:")
         for citation in answer.citations:
-            print(f"  {citation}")
+            print(f"  {citation.file_name}  {citation.url}")
     return 0
 
 

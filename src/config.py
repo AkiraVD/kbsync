@@ -12,9 +12,9 @@ load_dotenv()
 
 DEFAULT_LOCALE = "en-us"
 DEFAULT_OUT_DIR = "articles"
-DEFAULT_CHUNK_TOKENS = 800
-DEFAULT_OVERLAP_TOKENS = 200
-DEFAULT_MODEL = "gemini-3.8-flash"
+DEFAULT_CHUNK_TOKENS = 512
+DEFAULT_OVERLAP_TOKENS = 128
+DEFAULT_MODEL = "gemini-flash-latest"
 
 
 @dataclass(frozen=True)

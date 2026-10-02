@@ -48,22 +48,33 @@ class FakeClient:
 
 @pytest.fixture
 def store():
-    vector_store = VectorStore("key", STORE, Chunking(800, 200))
+    vector_store = VectorStore("key", STORE, Chunking(512, 128))
     vector_store.client = FakeClient()
     return vector_store
 
 
 def test_chunking_sends_a_whitespace_config():
-    assert Chunking(800, 200).as_param() == {
-        "whiteSpaceConfig": {"maxTokensPerChunk": 800, "maxOverlapTokens": 200}
+    assert Chunking(512, 128).as_param() == {
+        "whiteSpaceConfig": {"maxTokensPerChunk": 512, "maxOverlapTokens": 128}
     }
 
 
+def test_chunk_size_above_the_service_cap_is_refused():
+    """File Search rejects anything over 512, so fail before the API does."""
+    with pytest.raises(ValueError, match="must be 1-512"):
+        Chunking(800, 200)
+
+
+def test_overlap_beyond_half_the_chunk_is_refused():
+    with pytest.raises(ValueError, match="half"):
+        Chunking(512, 300)
+
+
 @pytest.mark.parametrize(
-    "characters, expected", [(100, 1), (800 * 4, 1), (1400 * 4, 2), (3000 * 4, 5)]
+    "characters, expected", [(100, 1), (512 * 4, 1), (1400 * 4, 4), (3000 * 4, 8)]
 )
 def test_chunk_estimate_grows_with_the_document(characters, expected):
-    assert Chunking(800, 200).estimate_chunks("x" * characters) == expected
+    assert Chunking(512, 128).estimate_chunks("x" * characters) == expected
 
 
 def test_metadata_carries_the_hash_the_next_run_compares(make_article):
@@ -105,7 +116,7 @@ def test_start_sends_chunking_and_metadata(store, make_article):
 
     body = store.client.calls[0][2]["json"]
     assert body["displayName"] == "add-a-video.md"
-    assert body["chunkingConfig"]["whiteSpaceConfig"]["maxTokensPerChunk"] == 800
+    assert body["chunkingConfig"]["whiteSpaceConfig"]["maxTokensPerChunk"] == 512
     assert {"key": "article_id", "stringValue": "42"} in body["customMetadata"]
 
 
@@ -121,7 +132,7 @@ def test_put_discards_the_document_it_replaces(store, make_article):
 
 def test_import_is_polled_until_done(monkeypatch, make_article):
     monkeypatch.setattr("src.vectorstore.time.sleep", lambda _: None)
-    store = VectorStore("key", STORE, Chunking(800, 200))
+    store = VectorStore("key", STORE, Chunking(512, 128))
     store.client = FakeClient(operations=[{"done": False}, {"done": True}])
     store.client.post = lambda url, **kwargs: {"name": "operations/i1", "done": False}
 
@@ -130,7 +141,7 @@ def test_import_is_polled_until_done(monkeypatch, make_article):
 
 def test_failed_import_raises(monkeypatch, make_article):
     monkeypatch.setattr("src.vectorstore.time.sleep", lambda _: None)
-    store = VectorStore("key", STORE, Chunking(800, 200))
+    store = VectorStore("key", STORE, Chunking(512, 128))
     store.client = FakeClient(operations=[{"done": True, "error": {"message": "nope"}}])
     store.client.post = lambda url, **kwargs: {"name": "operations/i1", "done": False}
 
@@ -139,7 +150,7 @@ def test_failed_import_raises(monkeypatch, make_article):
 
 
 def test_fetch_files_follows_pagination_and_skips_foreign_documents():
-    store = VectorStore("key", STORE, Chunking(800, 200))
+    store = VectorStore("key", STORE, Chunking(512, 128))
     store.client = FakeClient(
         pages=[
             {

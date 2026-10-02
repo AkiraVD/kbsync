@@ -75,7 +75,8 @@ def test_unsupported_hardware_invents_no_article_url(assistant, known_urls):
     """The hallucination guard: SmartBridge is not a product."""
     answer = assistant.ask("I'm using my SmartBridge")
 
-    cited = set(ARTICLE_URL.findall(answer.text)) | set(answer.citations)
+    cited = set(ARTICLE_URL.findall(answer.text))
+    cited |= {citation.url for citation in answer.citations if citation.url}
     invented = {url for url in cited if url.rstrip(".,)") not in known_urls}
 
     assert not invented, f"invented article urls: {invented}"

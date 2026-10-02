@@ -19,7 +19,8 @@ log = logging.getLogger(__name__)
 DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 DEFAULT_EMBEDDING_MODEL = "models/gemini-embedding-2"
 CHARS_PER_TOKEN = 4
-PAGE_SIZE = 100
+PAGE_SIZE = 20
+MAX_CHUNK_TOKENS = 512
 IMPORT_POLL_SECONDS = 3
 IMPORT_TIMEOUT_SECONDS = 300
 
@@ -34,6 +35,16 @@ class RemoteFile:
 class Chunking:
     max_tokens: int
     overlap_tokens: int
+
+    def __post_init__(self) -> None:
+        if not 1 <= self.max_tokens <= MAX_CHUNK_TOKENS:
+            raise ValueError(
+                f"CHUNK_SIZE_TOKENS must be 1-{MAX_CHUNK_TOKENS}, got {self.max_tokens}"
+            )
+        if self.overlap_tokens > self.max_tokens // 2:
+            raise ValueError(
+                "CHUNK_OVERLAP_TOKENS must not exceed half of CHUNK_SIZE_TOKENS"
+            )
 
     def as_param(self) -> dict:
         return {
