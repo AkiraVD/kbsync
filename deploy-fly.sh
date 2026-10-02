@@ -20,7 +20,7 @@ if docker info >/dev/null 2>&1; then
 fi
 
 image="$(fly deploy "${build_args[@]}" | tee /dev/stderr \
-  | grep -oE 'registry\.fly\.io/[^[:space:]]+' | tail -1)"
+  | sed -n 's/^image: //p' | tail -1)"
 
 if [ -z "$image" ]; then
   echo "could not read the image reference from fly deploy output" >&2
@@ -32,7 +32,7 @@ fly machine run "$image" -a "$APP" --schedule daily --restart no
 fly machine list -a "$APP"
 
 echo
-echo "Next run is on Fly's daily schedule. To run it now:"
-echo "  fly machine list -a $APP        # copy the id"
-echo "  fly machine start <id> -a $APP"
-echo "  fly logs -a $APP"
+echo "The Machine ran once on creation and now waits for its daily schedule."
+echo "  fly logs -a $APP                 # that run's output"
+echo "  fly machine start <id> -a $APP   # run it again on demand"
+echo "  fly apps destroy $APP            # when it is no longer needed"

@@ -11,6 +11,8 @@ import math
 import time
 from dataclasses import dataclass
 
+import requests
+
 from .http import Client
 from .models import Document
 
@@ -23,6 +25,10 @@ PAGE_SIZE = 20
 MAX_CHUNK_TOKENS = 512
 IMPORT_POLL_SECONDS = 3
 IMPORT_TIMEOUT_SECONDS = 300
+
+
+class UploadError(Exception):
+    """One document could not be stored; the run should carry on without it."""
 
 
 @dataclass(frozen=True)
@@ -106,8 +112,12 @@ class VectorStore:
         return files
 
     def put(self, document: Document, replacing: RemoteFile | None = None) -> str:
-        operation = self._upload(document)
-        name = self._await_import(operation)
+        try:
+            operation = self._upload(document)
+            name = self._await_import(operation)
+        except (requests.RequestException, TimeoutError, RuntimeError) as exc:
+            raise UploadError(f"{document.filename}: {exc}") from exc
+
         if replacing:
             self._discard(replacing.remote_id)
         return name

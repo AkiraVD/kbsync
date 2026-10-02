@@ -8,6 +8,7 @@ from src.state import VectorStoreState
 from src.vectorstore import (
     Chunking,
     RemoteFile,
+    UploadError,
     VectorStore,
     _metadata,
     _read_metadata,
@@ -145,7 +146,7 @@ def test_failed_import_raises(monkeypatch, make_article):
     store.client = FakeClient(operations=[{"done": True, "error": {"message": "nope"}}])
     store.client.post = lambda url, **kwargs: {"name": "operations/i1", "done": False}
 
-    with pytest.raises(RuntimeError, match="import failed"):
+    with pytest.raises(UploadError, match="import failed"):
         store.put(build(make_article()))
 
 

@@ -51,6 +51,8 @@ class SyncReport:
         default_factory=lambda: {status: [] for status in Status}
     )
     stale: list[str] = field(default_factory=list)
+    failed: list[str] = field(default_factory=list)
+    written: int = 0
     uploaded: int = 0
     chunks: int = 0
 
@@ -65,4 +67,5 @@ class SyncReport:
         return sum(len(slugs) for slugs in self.by_status.values())
 
     def summary(self) -> str:
-        return " ".join(f"{s.value}={self.count(s)}" for s in Status)
+        counts = " ".join(f"{s.value}={self.count(s)}" for s in Status)
+        return f"{counts} failed={len(self.failed)}" if self.failed else counts

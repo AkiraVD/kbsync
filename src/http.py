@@ -8,6 +8,7 @@ import requests
 log = logging.getLogger(__name__)
 
 RETRY_STATUSES = (429, 500, 502, 503, 504)
+RETRY_ERRORS = (requests.Timeout, requests.ConnectionError)
 MAX_ATTEMPTS = 4
 
 
@@ -37,9 +38,19 @@ class Client:
 
     def _request(self, method: str, url: str, **kwargs) -> requests.Response:
         for attempt in range(1, MAX_ATTEMPTS + 1):
-            response = self.session.request(
-                method, url, timeout=self.timeout, **kwargs
-            )
+            try:
+                response = self.session.request(
+                    method, url, timeout=self.timeout, **kwargs
+                )
+            except RETRY_ERRORS as exc:
+                # A read timeout is as transient as a 503 and has to be retried;
+                # without this one slow upload ends the whole run.
+                if attempt == MAX_ATTEMPTS:
+                    raise
+                wait = 2**attempt
+                log.warning("%s on %s, retrying in %ss", type(exc).__name__, url, wait)
+                time.sleep(wait)
+                continue
 
             if response.status_code in RETRY_STATUSES and attempt < MAX_ATTEMPTS:
                 wait = int(response.headers.get("Retry-After", 2**attempt))

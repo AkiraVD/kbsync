@@ -34,11 +34,11 @@ def main() -> int:
     )
     report = sync(settings, limit=args.limit, upload=not args.no_upload)
 
-    if not report.total:
+    if not report.written:
         log.error("the API returned no published articles")
         return 1
 
-    log.info("wrote %d Markdown files to %s", report.total, settings.out_dir)
+    log.info("wrote %d Markdown files to %s", report.written, settings.out_dir)
     log.info("%s", report.summary())
     if report.uploaded:
         log.info(
@@ -48,6 +48,10 @@ def main() -> int:
             settings.chunking.max_tokens,
             settings.chunking.overlap_tokens,
         )
+
+    if report.failed:
+        log.error("%d upload(s) failed: %s", len(report.failed), ", ".join(report.failed[:5]))
+        return 1
     return 0
 
 

@@ -9,7 +9,7 @@ from .manifest import Manifest
 from .models import Article, Document, Status, SyncReport
 from .state import StateStore, VectorStoreState
 from .store import ArticleStore
-from .vectorstore import VectorStore
+from .vectorstore import UploadError, VectorStore
 
 log = logging.getLogger(__name__)
 
@@ -30,11 +30,19 @@ def sync(settings: Settings, limit: int | None = None, upload: bool = True) -> S
     for document in documents:
         status = state.status(document)
         store.write(document)
-        manifest.record(document)
+        report.written += 1
 
         if uploader and status is not Status.SKIPPED:
-            _upload(uploader, state, document, report)
+            try:
+                _upload(uploader, state, document, report)
+            except UploadError as exc:
+                # A daily job that loses 400 good articles to one bad upload is
+                # worse than one that reports the gap and exits non-zero.
+                log.warning("%s", exc)
+                report.failed.append(document.slug)
+                continue
 
+        manifest.record(document)
         report.record(status, document.slug)
 
     manifest.save(settings.out_dir, prune=not cap)
