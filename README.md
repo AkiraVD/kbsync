@@ -19,8 +19,8 @@ python main.py --create-store kbsync   # once; paste the name into .env
 python main.py                      # full sync; --limit N for a quick pass
 python main.py --no-upload          # Markdown only, no API key needed
 python main.py --ask "How do I add a YouTube video?"
-pytest -q                           # 49 offline tests
-pytest -m eval                      # 6-case eval set; hits the API
+pytest -q                           # 63 offline tests, no key needed
+pytest -m eval                      # 6-case eval set, against the live store
 ```
 
 With Docker, which is what the scheduled job runs:
@@ -45,6 +45,11 @@ rather than by the API.
 Every file repeats its `Article URL:` outside the YAML front matter. That is load-bearing: a
 File Search citation hands back the matched **chunk text**, not a link, so the URL has to be
 in the body for an answer to cite it. Each run logs files written and chunks embedded.
+
+Both suites as they actually ran — 63 offline in 0.3s, 6 live in 61s, all passing — are
+captured in [`docs/test-results/`](docs/test-results/). The eval set comes from real
+conversations with the production bot; one case asks about a player that does not exist and
+asserts no article URL is invented, checking anything cited against the manifest.
 
 ## Daily job
 
