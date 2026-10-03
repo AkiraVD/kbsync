@@ -1,0 +1,35 @@
+=== 2026-10-03 08:00:01 +07 eval run after quota reset ===
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /media/akiravd/Data/app/optisigns-assignment/kbsync/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /media/akiravd/Data/app/optisigns-assignment/kbsync
+configfile: pytest.ini
+testpaths: tests
+collecting ... collected 69 items / 63 deselected / 6 selected
+
+tests/test_eval.py::test_youtube_question_answers_with_a_citation PASSED [ 16%]
+tests/test_eval.py::test_getting_started_cites_an_article PASSED         [ 33%]
+tests/test_eval.py::test_definition_follow_up_stays_short PASSED         [ 50%]
+tests/test_eval.py::test_pairing_code_problem_is_handled PASSED          [ 66%]
+tests/test_eval.py::test_unsupported_hardware_invents_no_article_url PASSED [ 83%]
+tests/test_eval.py::test_typo_still_gets_an_answer PASSED                [100%]
+
+================= 6 passed, 63 deselected in 61.43s (0:01:01) ==================
+=== pytest exit: 0 ===
+
+=== the brief's screenshot question ===
+
+Q: How do I add a YouTube video?
+
+To add a YouTube video to OptiSigns, follow these steps:
+
+* Log in to the OptiSigns portal and navigate to **Files/Assets** > **Apps**.
+* Search for and select the **YouTube** app.
+* Enter a **Name** (optional) and paste your YouTube video, share, or Shorts link into the **URL** field.
+* Configure optional settings like **Display options** (captions, mute) or **Playback options** (start/end times).
+* Click **Save** to add the asset, then assign it to your screens or playlists.
+
+For more details, check out the full guide here: [Article URL: https://support.optisigns.com/hc/en-us/articles/360051014713-How-to-Use-YouTube-with-OptiSigns](https://support.optisigns.com/hc/en-us/articles/360051014713-How-to-Use-YouTube-with-OptiSigns)
+
+Retrieved from:
+  how-to-use-youtube-with-optisigns.md  https://support.optisigns.com/hc/en-us/articles/360051014713-How-to-Use-YouTube-with-OptiSigns
